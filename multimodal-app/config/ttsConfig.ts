@@ -1,14 +1,11 @@
 export const TTSConfig = {
   model: {
-    url: "https://huggingface.co/Cactus-Compute/OuteTTS-0.2-500M-GGUF/resolve/main/model.gguf",
+    url: "https://huggingface.co/tensorblock/bling-tiny-llama-v0-GGUF/resolve/main/bling-tiny-llama-v0-Q3_K_M.gguf",
     filename: "tts-model.gguf",
   },
   vocoder: {
-    url: "https://huggingface.co/Cactus-Compute/OuteTTS-0.2-500M-GGUF/resolve/main/vocoder.gguf",
-    filename: "vocoder.gguf",
-  },
-  llamaOptions: {
-    n_ctx: 1024,
+    url: "",
+    filename: "",
   },
   generateOptions: {
     speaker_id: 0,

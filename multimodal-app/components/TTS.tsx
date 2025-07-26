@@ -1,6 +1,6 @@
-import { CactusTTS, initLlama } from "cactus-react-native";
+import { CactusTTS, initLlama, LlamaContext } from "cactus-react-native";
 import { useEffect, useState } from "react";
-import RNFS from "react-native-fs";
+import * as FileSystem from "expo-file-system";
 
 import { TTSConfig } from "@/config/ttsConfig";
 import { useModelDownload } from "@/hooks/useModelDownload";
@@ -8,7 +8,7 @@ import {
   requestStoragePermission,
   checkAndroidVersion,
 } from "@/utils/permissions";
-import { useScopedStorage } from "@/utils/storage";
+import { useScopedStorage, cleanPath } from "@/utils/storage";
 import { View, Text, ActivityIndicator } from "react-native";
 
 export default function TTSComponent({ message }: { message: string }) {
@@ -23,7 +23,7 @@ export default function TTSComponent({ message }: { message: string }) {
         setError(null);
 
         if (await checkAndroidVersion()) {
-          // Modern Android (11+) - Initialize scoped storage
+          // Modern Android - Initialize scoped storage
           console.log("Using modern Android storage approach");
           try {
             const directories = await useScopedStorage();
@@ -38,7 +38,7 @@ export default function TTSComponent({ message }: { message: string }) {
             return;
           }
         } else {
-          // Legacy Android or iOS - Request permissions
+          // Request permissions
           console.log("Using legacy storage approach");
           const hasPermission = await requestStoragePermission();
           if (!hasPermission) {
@@ -47,18 +47,23 @@ export default function TTSComponent({ message }: { message: string }) {
           }
         }
 
-        // Download models (paths are now automatically cleaned)
+        // Download models
         console.log("Starting model downloads...");
         const ttsModelPath = await downloadModel(
           TTSConfig.model.url,
           TTSConfig.model.filename
         );
-        const vocoderPath = await downloadModel(
-          TTSConfig.vocoder.url,
-          TTSConfig.vocoder.filename
-        );
 
-        if (!ttsModelPath || !vocoderPath) {
+        // ADD: Check if vocoder is needed
+        let vocoderPath = undefined;
+        if (TTSConfig.vocoder.url) {
+          vocoderPath = await downloadModel(
+            TTSConfig.vocoder.url,
+            TTSConfig.vocoder.filename
+          );
+        }
+
+        if (!ttsModelPath || (TTSConfig.vocoder.url && !vocoderPath)) {
           setError("Failed to download required models.");
           return;
         }
@@ -67,26 +72,28 @@ export default function TTSComponent({ message }: { message: string }) {
         console.log("TTS Model Path:", ttsModelPath);
         console.log("Vocoder Path:", vocoderPath);
 
-        // Debug: Verify files actually exist at these paths
+        // DEBUG: Verify files actually exist at these paths
         try {
-          const ttsExists = await RNFS.exists(ttsModelPath);
-          const vocoderExists = await RNFS.exists(vocoderPath);
-          
-          console.log("TTS Model exists:", ttsExists);
-          console.log("Vocoder exists:", vocoderExists);
-          
-          if (ttsExists) {
-            const ttsStats = await RNFS.stat(ttsModelPath);
-            console.log("TTS Model size:", ttsStats.size, "bytes");
+          const ttsFileInfo = await FileSystem.getInfoAsync(ttsModelPath);
+          const vocoderFileInfo = vocoderPath
+            ? await FileSystem.getInfoAsync(vocoderPath)
+            : { exists: true, size: 0 };
+
+          console.log("TTS Model exists:", ttsFileInfo.exists);
+          console.log("Vocoder exists:", vocoderFileInfo.exists);
+
+          if (ttsFileInfo.exists) {
+            console.log("TTS Model size:", ttsFileInfo.size, "bytes");
           }
-          
-          if (vocoderExists) {
-            const vocoderStats = await RNFS.stat(vocoderPath);
-            console.log("Vocoder size:", vocoderStats.size, "bytes");
+
+          if (vocoderFileInfo.exists) {
+            console.log("Vocoder size:", vocoderFileInfo.size, "bytes");
           }
-          
-          if (!ttsExists || !vocoderExists) {
-            setError(`Model files not found. TTS: ${ttsExists}, Vocoder: ${vocoderExists}`);
+
+          if (!ttsFileInfo.exists || !vocoderFileInfo.exists) {
+            setError(
+              `Model files not found. TTS: ${ttsFileInfo.exists}, Vocoder: ${vocoderFileInfo.exists}`
+            );
             return;
           }
         } catch (fileCheckError) {
@@ -97,12 +104,11 @@ export default function TTSComponent({ message }: { message: string }) {
 
         // Init LLM
         const context = await initLlama({
-          model: ttsModelPath,
-          ...TTSConfig.llamaOptions,
+          model: cleanPath(ttsModelPath),
         });
 
         // Init TTS and Speaking
-        const tts = await CactusTTS.init(context, vocoderPath);
+        const tts = await CactusTTS.init(context, vocoderPath || ttsModelPath);
         await tts.generate(message, JSON.stringify(TTSConfig.generateOptions));
         await tts.release();
 
@@ -141,9 +147,7 @@ export default function TTSComponent({ message }: { message: string }) {
         </>
       )}
 
-      {isReady && !error && (
-        <Text>🎉 TTS is ready and playing your message!</Text>
-      )}
+      {isReady && !error && <Text>TTS is ready and playing your message!</Text>}
     </View>
   );
 }

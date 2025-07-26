@@ -1,8 +1,7 @@
 import { useState, useCallback } from "react";
-import RNFS from "react-native-fs";
-import { useScopedStorage, cleanPath } from "@/utils/storage";
+import * as FileSystem from "expo-file-system";
+import { useScopedStorage } from "@/utils/storage";
 import { checkAndroidVersion } from "@/utils/permissions";
-
 
 interface DownloadProgress {
   progress: number;
@@ -22,7 +21,7 @@ export const useModelDownload = () => {
         try {
           const directories = await useScopedStorage();
           if (directories && directories.models) {
-            return cleanPath(`${directories.models}${filename}`);
+            return `${directories.models}${filename}`;
           }
         } catch (error) {
           console.warn(
@@ -33,7 +32,7 @@ export const useModelDownload = () => {
       }
 
       // Fallback to RNFS DocumentDirectory for older Android or iOS
-      return `${RNFS.DocumentDirectoryPath}/${filename}`;
+      return `${FileSystem.documentDirectory}${filename}`;
     },
     []
   );
@@ -44,9 +43,11 @@ export const useModelDownload = () => {
       const directory = filePath.substring(0, filePath.lastIndexOf("/"));
 
       try {
-        const exists = await RNFS.exists(directory);
+        const exists = await FileSystem.getInfoAsync(directory);
         if (!exists) {
-          await RNFS.mkdir(directory);
+          await FileSystem.makeDirectoryAsync(directory, {
+            intermediates: true,
+          });
           console.log("Created directory:", directory);
         }
       } catch (error) {
@@ -65,25 +66,23 @@ export const useModelDownload = () => {
         await ensureDirectoryExists(path);
 
         // Check if file already exists
-        if (await RNFS.exists(path)) {
-          const stats = await RNFS.stat(path);
-          if (stats.size > 0) {
-            console.log(`Model ${filename} already exists at: ${path}`);
+        const fileInfo = await FileSystem.getInfoAsync(path);
+        if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
+          console.log(`Model ${filename} already exists at: ${path}`);
 
-            // Update state to show it's complete
-            setDownloads(
-              (prev) =>
-                new Map(
-                  prev.set(filename, {
-                    progress: 1,
-                    isDownloading: false,
-                    error: null,
-                  })
-                )
-            );
+          // Update state to show it's complete
+          setDownloads(
+            (prev) =>
+              new Map(
+                prev.set(filename, {
+                  progress: 1,
+                  isDownloading: false,
+                  error: null,
+                })
+              )
+          );
 
-            return path;
-          }
+          return path;
         }
 
         console.log(`Starting download of ${filename} to: ${path}`);
@@ -100,12 +99,15 @@ export const useModelDownload = () => {
             )
         );
 
-        // Start Download
-        await RNFS.downloadFile({
-          fromUrl: url,
-          toFile: path,
-          progress: (res) => {
-            const progress = res.bytesWritten / res.contentLength;
+        // Create download resumable for progress tracking
+        const downloadResumable = FileSystem.createDownloadResumable(
+          url,
+          path,
+          {},
+          (downloadProgress) => {
+            const progress =
+              downloadProgress.totalBytesWritten /
+              downloadProgress.totalBytesExpectedToWrite;
             console.log(
               `Download progress for ${filename}: ${(progress * 100).toFixed(
                 1
@@ -122,23 +124,30 @@ export const useModelDownload = () => {
                   })
                 )
             );
-          },
-        }).promise;
-
-        // Download Complete
-        setDownloads(
-          (prev) =>
-            new Map(
-              prev.set(filename, {
-                progress: 1,
-                isDownloading: false,
-                error: null,
-              })
-            )
+          }
         );
 
-        console.log(`Download completed for ${filename}: ${path}`);
-        return path;
+        // Start download
+        const result = await downloadResumable.downloadAsync();
+
+        if (result && result.status === 200) {
+          // Download Complete
+          setDownloads(
+            (prev) =>
+              new Map(
+                prev.set(filename, {
+                  progress: 1,
+                  isDownloading: false,
+                  error: null,
+                })
+              )
+          );
+
+          console.log(`Download completed for ${filename}: ${path}`);
+          return path;
+        } else {
+          throw new Error(`Download failed with status: ${result?.status}`);
+        }
       } catch (error) {
         console.error(`Download error for ${filename}:`, error);
 
@@ -168,8 +177,8 @@ export const useModelDownload = () => {
     async (filename: string): Promise<string | null> => {
       try {
         const path = await getStoragePath(filename);
-        const exists = await RNFS.exists(path);
-        return exists ? path : null;
+        const fileInfo = await FileSystem.getInfoAsync(path);
+        return fileInfo.exists ? path : null;
       } catch (error) {
         console.error(`Error checking model path for ${filename}:`, error);
         return null;
@@ -183,10 +192,10 @@ export const useModelDownload = () => {
     async (filename: string): Promise<boolean> => {
       try {
         const path = await getStoragePath(filename);
-        const exists = await RNFS.exists(path);
+        const fileInfo = await FileSystem.getInfoAsync(path);
 
-        if (exists) {
-          await RNFS.unlink(path);
+        if (fileInfo.exists) {
+          await FileSystem.deleteAsync(path);
 
           // Clear download state
           setDownloads((prev) => {
