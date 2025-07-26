@@ -82,7 +82,7 @@ export async function requestStoragePermission() {
 }
 
 // Alternative function for Android 13+ (API 33+)
-export async function requestModernStoragePermission() {
+export async function checkAndroidVersion() {
   if (Platform.OS !== "android") {
     console.log("iOS or web platform - no permission needed.");
     return true;

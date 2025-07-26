@@ -1,5 +1,8 @@
 import { useState, useCallback } from "react";
 import RNFS from "react-native-fs";
+import { useScopedStorage, cleanPath } from "@/utils/storage";
+import { checkAndroidVersion } from "@/utils/permissions";
+
 
 interface DownloadProgress {
   progress: number;
@@ -12,32 +15,103 @@ export const useModelDownload = () => {
     new Map()
   );
 
-  const downloadModel = useCallback(
-    async (url: string, filename: string): Promise<string> => {
-      const path = `${RNFS.DocumentDirectoryPath}/${filename}`;
-
-      if (await RNFS.exists(path)) {
-        const stats = await RNFS.stat(path);
-        if (stats.size > 0) return path;
+  // ADD: Scoped storage setup
+  const getStoragePath = useCallback(
+    async (filename: string): Promise<string> => {
+      if (await checkAndroidVersion()) {
+        try {
+          const directories = await useScopedStorage();
+          if (directories && directories.models) {
+            return cleanPath(`${directories.models}${filename}`);
+          }
+        } catch (error) {
+          console.warn(
+            "Scoped storage failed, falling back to DocumentDirectory:",
+            error
+          );
+        }
       }
 
-      setDownloads(
-        (prev) =>
-          new Map(
-            prev.set(filename, {
-              progress: 0,
-              isDownloading: true,
-              error: null,
-            })
-          )
-      );
+      // Fallback to RNFS DocumentDirectory for older Android or iOS
+      return `${RNFS.DocumentDirectoryPath}/${filename}`;
+    },
+    []
+  );
+
+  //  ADD: Check Directory Existence
+  const ensureDirectoryExists = useCallback(
+    async (filePath: string): Promise<void> => {
+      const directory = filePath.substring(0, filePath.lastIndexOf("/"));
 
       try {
+        const exists = await RNFS.exists(directory);
+        if (!exists) {
+          await RNFS.mkdir(directory);
+          console.log("Created directory:", directory);
+        }
+      } catch (error) {
+        console.warn("Directory creation failed:", error);
+      }
+    },
+    []
+  );
+
+  const downloadModel = useCallback(
+    async (url: string, filename: string): Promise<string> => {
+      try {
+        const path = await getStoragePath(filename);
+
+        // Ensure the directory exists
+        await ensureDirectoryExists(path);
+
+        // Check if file already exists
+        if (await RNFS.exists(path)) {
+          const stats = await RNFS.stat(path);
+          if (stats.size > 0) {
+            console.log(`Model ${filename} already exists at: ${path}`);
+
+            // Update state to show it's complete
+            setDownloads(
+              (prev) =>
+                new Map(
+                  prev.set(filename, {
+                    progress: 1,
+                    isDownloading: false,
+                    error: null,
+                  })
+                )
+            );
+
+            return path;
+          }
+        }
+
+        console.log(`Starting download of ${filename} to: ${path}`);
+
+        // Initialize download state
+        setDownloads(
+          (prev) =>
+            new Map(
+              prev.set(filename, {
+                progress: 0,
+                isDownloading: true,
+                error: null,
+              })
+            )
+        );
+
+        // Start Download
         await RNFS.downloadFile({
           fromUrl: url,
           toFile: path,
           progress: (res) => {
             const progress = res.bytesWritten / res.contentLength;
+            console.log(
+              `Download progress for ${filename}: ${(progress * 100).toFixed(
+                1
+              )}%`
+            );
+
             setDownloads(
               (prev) =>
                 new Map(
@@ -51,6 +125,7 @@ export const useModelDownload = () => {
           },
         }).promise;
 
+        // Download Complete
         setDownloads(
           (prev) =>
             new Map(
@@ -62,8 +137,11 @@ export const useModelDownload = () => {
             )
         );
 
+        console.log(`Download completed for ${filename}: ${path}`);
         return path;
       } catch (error) {
+        console.error(`Download error for ${filename}:`, error);
+
         setDownloads(
           (prev) =>
             new Map(
@@ -82,8 +160,68 @@ export const useModelDownload = () => {
         throw error;
       }
     },
-    []
+    [getStoragePath, ensureDirectoryExists]
   );
 
-  return { downloadModel, downloads };
+  // ADD: Get Model Path
+  const getModelPath = useCallback(
+    async (filename: string): Promise<string | null> => {
+      try {
+        const path = await getStoragePath(filename);
+        const exists = await RNFS.exists(path);
+        return exists ? path : null;
+      } catch (error) {
+        console.error(`Error checking model path for ${filename}:`, error);
+        return null;
+      }
+    },
+    [getStoragePath]
+  );
+
+  // ADD: Delete Model
+  const deleteModel = useCallback(
+    async (filename: string): Promise<boolean> => {
+      try {
+        const path = await getStoragePath(filename);
+        const exists = await RNFS.exists(path);
+
+        if (exists) {
+          await RNFS.unlink(path);
+
+          // Clear download state
+          setDownloads((prev) => {
+            const newMap = new Map(prev);
+            newMap.delete(filename);
+            return newMap;
+          });
+
+          console.log(`Deleted model: ${filename}`);
+          return true;
+        }
+
+        return false;
+      } catch (error) {
+        console.error(`Error deleting model ${filename}:`, error);
+        return false;
+      }
+    },
+    [getStoragePath]
+  );
+
+  // ADD: Clear Download State
+  const clearDownload = useCallback((filename: string) => {
+    setDownloads((prev) => {
+      const newMap = new Map(prev);
+      newMap.delete(filename);
+      return newMap;
+    });
+  }, []);
+
+  return {
+    downloadModel,
+    downloads,
+    getModelPath,
+    deleteModel,
+    clearDownload,
+  };
 };
