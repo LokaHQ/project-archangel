@@ -7,6 +7,9 @@ export const TTSConfig = {
     url: "",
     filename: "vocoder-model.gguf",
   },
+  contextOptions: {
+    n_ctx: 512,
+  },
   generateOptions: {
     speaker_id: 0,
   },

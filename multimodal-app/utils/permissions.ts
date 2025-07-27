@@ -1,5 +1,14 @@
 import { PermissionsAndroid, Platform, Alert, Linking } from "react-native";
 
+/**
+ * Requests storage permission on Android devices.
+ *
+ * - For iOS and other platforms, resolves to true immediately.
+ * - On Android, it checks if permission is already granted, otherwise requests it.
+ * - Handles user responses including denial and permanent denial by showing alerts.
+ *
+ * @returns {Promise<boolean>} True if permission is granted, false otherwise.
+ */
 export async function requestStoragePermission() {
   if (Platform.OS !== "android") {
     console.log("iOS or web platform - no permission needed.");
@@ -81,7 +90,14 @@ export async function requestStoragePermission() {
   }
 }
 
-// Alternative function for Android 13+ (API 33+)
+/**
+ * Checks if the Android version supports scoped storage (API 33+),
+ * and requests storage permission if needed on lower versions.
+ *
+ * For non-Android platforms, resolves to true immediately.
+ *
+ * @returns {Promise<boolean>} True if scoped storage is used or permission is granted, false otherwise.
+ */
 export async function checkAndroidVersion() {
   if (Platform.OS !== "android") {
     console.log("iOS or web platform - no permission needed.");
@@ -93,7 +109,7 @@ export async function checkAndroidVersion() {
 
     if (androidVersion >= 33) {
       console.log("Android 13+ detected, using scoped storage approach");
-      return true;  
+      return true;
     }
     return await requestStoragePermission();
   } catch (error) {

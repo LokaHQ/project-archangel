@@ -1,9 +1,13 @@
-import {
-  CactusTTS,
-  initLlama,
-  LlamaContext,
-  loadLlamaModelInfo,
-} from "cactus-react-native";
+/**
+ * TTSComponent.tsx
+ *
+ * A React Native component that handles model downloading,
+ * Llama TTS initialization, and message playback using Expo Speech.
+ *
+ * Supports both scoped and legacy Android storage, and includes
+ * automatic model file verification.
+ */
+import { CactusTTS, initLlama, LlamaContext } from "cactus-react-native";
 import { useEffect, useState } from "react";
 import * as FileSystem from "expo-file-system";
 
@@ -15,12 +19,41 @@ import {
 } from "@/utils/permissions";
 import { useScopedStorage, cleanPath } from "@/utils/storage";
 import { View, Text, ActivityIndicator } from "react-native";
+import * as Speech from "expo-speech";
 
+interface SpeechOptions {
+  language?: string;
+  pitch?: number;
+  rate?: number;
+  onDone?: () => void;
+  onError?: (error: SpeechError) => void;
+}
+
+interface SpeechError {
+  message?: string;
+  code?: string;
+}
+
+/**
+ * TTSComponent
+ *
+ * React component that:
+ * - Initializes scoped or legacy storage
+ * - Downloads TTS model and vocoder
+ * - Verifies file existence
+ * - Initializes Llama context + CactusTTS
+ * - Uses Expo Speech to speak the message aloud
+ *
+ * @param message - The message to be spoken aloud
+ */
 export default function TTSComponent({ message }: { message: string }) {
   const { downloadModel, downloads } = useModelDownload();
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Effect: Handles the entire lifecycle of model preparation and speech.
+   */
   useEffect(() => {
     (async () => {
       try {
@@ -113,7 +146,7 @@ export default function TTSComponent({ message }: { message: string }) {
         try {
           context = await initLlama({
             model: ttsModelPath,
-            n_ctx: 512,
+            n_ctx: TTSConfig.contextOptions.n_ctx,
           });
           if (!context) {
             throw new Error("Failed to initialize Llama context");
@@ -132,6 +165,38 @@ export default function TTSComponent({ message }: { message: string }) {
         // await tts.generate(message, '{"speaker_id": 0}');
         // console.log("TTS generation complete, playing message...");
         // await tts.release();
+
+        console.log("Speaking message with Expo Speech...");
+
+        // DEBUG: List available voices
+        // const voices = await Speech.getAvailableVoicesAsync();
+        // const enUSVoices = voices.filter(v => v.language === "en-US");
+        // console.log("US English voices:", enUSVoices);
+
+        // DEBUG: Hear each voice
+        // console.log("Testing US English voices...");
+        // enUSVoices.forEach(v => Speech.speak(v.name, {
+        //   voice: v.identifier,
+        //   language: v.language,
+        //   rate: 1.0,
+        //   pitch: 1.0,
+        // }));
+
+        Speech.speak(message, {
+          language: "en-US",
+          voice: "en-us-x-tpc-network",
+          pitch: 1.0,
+          rate: 1.0,
+          onDone: (): void => {
+            console.log("Finished speaking!");
+            setIsReady(true);
+          },
+          onError: (error: SpeechError): void => {
+            console.error("Speech error:", error);
+            setError("Failed to speak the message.");
+          },
+        } as SpeechOptions);
+
         setIsReady(true);
         console.log("TTS initialization complete!");
       } catch (e) {

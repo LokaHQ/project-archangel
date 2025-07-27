@@ -1,12 +1,17 @@
 import { Image } from "expo-image";
-import { Platform, StyleSheet } from "react-native";
+import { StyleSheet } from "react-native";
 
-import { HelloWave } from "@/components/predefined/HelloWave";
 import ParallaxScrollView from "@/components/predefined/ParallaxScrollView";
 import { ThemedText } from "@/components/predefined/ThemedText";
 import { ThemedView } from "@/components/predefined/ThemedView";
 
+// TTS Import
+import TTSComponent from "@/components/TTS";
+
 export default function HomeScreen() {
+  const welcomeMessage =
+    "Hey, welcome to Project Archangel. You are now entering testing mode.";
+
   return (
     <ParallaxScrollView
       headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
@@ -19,8 +24,8 @@ export default function HomeScreen() {
     >
       <ThemedView style={styles.titleContainer}>
         <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
       </ThemedView>
+      <TTSComponent message={welcomeMessage} />
     </ParallaxScrollView>
   );
 }

@@ -9,12 +9,21 @@ interface DownloadProgress {
   error: string | null;
 }
 
+/**
+ * Hook to handle downloading, caching, and managing TTS or LLM models.
+ * Includes scoped storage support for Android and progress tracking.
+ */
 export const useModelDownload = () => {
   const [downloads, setDownloads] = useState<Map<string, DownloadProgress>>(
     new Map()
   );
 
-  // ADD: Scoped storage setup
+  /**
+   * Returns a safe path to store the model file depending on platform.
+   *
+   * @param filename - The desired filename for the model.
+   * @returns Full file path for saving the model.
+   */
   const getStoragePath = useCallback(
     async (filename: string): Promise<string> => {
       if (await checkAndroidVersion()) {
@@ -37,7 +46,11 @@ export const useModelDownload = () => {
     []
   );
 
-  //  ADD: Check Directory Existence
+  /**
+   * Ensures the parent directory for a file path exists. Creates it if not.
+   *
+   * @param filePath - Full file path (not just the directory).
+   */
   const ensureDirectoryExists = useCallback(
     async (filePath: string): Promise<void> => {
       const directory = filePath.substring(0, filePath.lastIndexOf("/"));
@@ -57,6 +70,13 @@ export const useModelDownload = () => {
     []
   );
 
+  /**
+   * Downloads a model file from the given URL, tracks progress, and stores it locally.
+   *
+   * @param url - The model URL to fetch.
+   * @param filename - The filename to save as.
+   * @returns Full path to the saved file.
+   */
   const downloadModel = useCallback(
     async (url: string, filename: string): Promise<string> => {
       try {
@@ -172,7 +192,12 @@ export const useModelDownload = () => {
     [getStoragePath, ensureDirectoryExists]
   );
 
-  // ADD: Get Model Path
+  /**
+   * Returns the full path to a model file if it exists.
+   *
+   * @param filename - The filename to check.
+   * @returns Full path if exists, otherwise null.
+   */
   const getModelPath = useCallback(
     async (filename: string): Promise<string | null> => {
       try {
@@ -187,7 +212,12 @@ export const useModelDownload = () => {
     [getStoragePath]
   );
 
-  // ADD: Delete Model
+  /**
+   * Deletes a locally stored model file and clears its state.
+   *
+   * @param filename - The filename of the model to delete.
+   * @returns True if deleted, false otherwise.
+   */
   const deleteModel = useCallback(
     async (filename: string): Promise<boolean> => {
       try {
@@ -217,7 +247,11 @@ export const useModelDownload = () => {
     [getStoragePath]
   );
 
-  // ADD: Clear Download State
+  /**
+   * Clears the download state of a specific model.
+   *
+   * @param filename - The filename to remove from the download state.
+   */
   const clearDownload = useCallback((filename: string) => {
     setDownloads((prev) => {
       const newMap = new Map(prev);
