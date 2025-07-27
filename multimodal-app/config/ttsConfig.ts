@@ -1,11 +1,11 @@
 export const TTSConfig = {
   model: {
-    url: "https://huggingface.co/tensorblock/bling-tiny-llama-v0-GGUF/resolve/main/bling-tiny-llama-v0-Q3_K_M.gguf",
+    url: "https://huggingface.co/mradermacher/indri-0.1-350m-tts-GGUF/resolve/main/indri-0.1-350m-tts.Q4_K_M.gguf",
     filename: "tts-model.gguf",
   },
   vocoder: {
     url: "",
-    filename: "",
+    filename: "vocoder-model.gguf",
   },
   generateOptions: {
     speaker_id: 0,

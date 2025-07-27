@@ -1,4 +1,9 @@
-import { CactusTTS, initLlama, LlamaContext } from "cactus-react-native";
+import {
+  CactusTTS,
+  initLlama,
+  LlamaContext,
+  loadLlamaModelInfo,
+} from "cactus-react-native";
 import { useEffect, useState } from "react";
 import * as FileSystem from "expo-file-system";
 
@@ -103,15 +108,30 @@ export default function TTSComponent({ message }: { message: string }) {
         }
 
         // Init LLM
-        const context = await initLlama({
-          model: cleanPath(ttsModelPath),
-        });
+        console.log("Context Init...");
+        let context: LlamaContext;
+        try {
+          context = await initLlama({
+            model: ttsModelPath,
+            n_ctx: 512,
+          });
+          if (!context) {
+            throw new Error("Failed to initialize Llama context");
+          }
+          console.log("Context Initialized:", context.id);
+        } catch (initError) {
+          console.error("Llama context initialization failed:", initError);
+          return;
+        }
 
         // Init TTS and Speaking
         const tts = await CactusTTS.init(context, vocoderPath || ttsModelPath);
-        await tts.generate(message, JSON.stringify(TTSConfig.generateOptions));
-        await tts.release();
+        console.log("TTS Initialized:", tts);
 
+        // TO-DO: Fix Audio Generation
+        // await tts.generate(message, '{"speaker_id": 0}');
+        // console.log("TTS generation complete, playing message...");
+        // await tts.release();
         setIsReady(true);
         console.log("TTS initialization complete!");
       } catch (e) {
