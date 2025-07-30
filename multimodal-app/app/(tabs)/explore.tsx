@@ -4,24 +4,23 @@ import ParallaxScrollView from "@/components/predefined/ParallaxScrollView";
 import { ThemedText } from "@/components/predefined/ThemedText";
 import { ThemedView } from "@/components/predefined/ThemedView";
 import { IconSymbol } from "@/components/ui/IconSymbol";
+import VisionChat from "@/components/VLM";
 
 export default function TabTwoScreen() {
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#D0D0D0", dark: "#353636" }}
-      headerImage={
-        <IconSymbol
-          size={310}
-          color="#808080"
-          name="chevron.left.forwardslash.chevron.right"
-          style={styles.headerImage}
-        />
-      }
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Explore</ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    // <ParallaxScrollView
+    //   headerBackgroundColor={{ light: "#D0D0D0", dark: "#353636" }}
+    //   headerImage={
+    //     <IconSymbol
+    //       size={310}
+    //       color="#808080"
+    //       name="chevron.left.forwardslash.chevron.right"
+    //       style={styles.headerImage}
+    //     />
+    //   }
+    // >
+    // </ParallaxScrollView>
+    <VisionChat></VisionChat>
   );
 }
 
