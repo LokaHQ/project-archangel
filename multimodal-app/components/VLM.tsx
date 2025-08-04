@@ -40,6 +40,7 @@ export default function ContinuousVisionCamera() {
     "interval"
   );
   const [userPrompt, setUserPrompt] = useState("Describe what's ahead of me.");
+  const [showIntervalControls, setShowIntervalControls] = useState(false);
 
   useEffect(() => {
     initializeVLM();
@@ -382,33 +383,36 @@ export default function ContinuousVisionCamera() {
       </ParallaxScrollView>
 
       {/* Interval controls */}
-      <View style={styles.intervalContainer}>
-        <Text style={styles.intervalTitle}>
-          Capture Interval: {captureInterval / 1000}s
-        </Text>
-        <View style={styles.intervalButtons}>
-          {[1000, 2000, 3000, 5000].map((interval) => (
-            <TouchableOpacity
-              key={interval}
-              style={[
-                styles.intervalButton,
-                captureInterval === interval && styles.intervalButtonActive,
-              ]}
-              onPress={() => setCaptureInterval(interval)}
-            >
-              <Text
+      {showIntervalControls && (
+        <View style={styles.intervalContainer}>
+          <Text style={styles.intervalTitle}>
+            Capture Interval: {captureInterval / 1000}s
+          </Text>
+          <View style={styles.intervalButtons}>
+            {[1000, 2000, 3000, 5000].map((interval) => (
+              <TouchableOpacity
+                key={interval}
                 style={[
-                  styles.intervalButtonText,
-                  captureInterval === interval &&
-                    styles.intervalButtonTextActive,
+                  styles.intervalButton,
+                  captureInterval === interval && styles.intervalButtonActive,
                 ]}
+                onPress={() => setCaptureInterval(interval)}
               >
-                {interval / 1000}s
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text
+                  style={[
+                    styles.intervalButtonText,
+                    captureInterval === interval &&
+                      styles.intervalButtonTextActive,
+                  ]}
+                >
+                  {interval / 1000}s
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </View>
+      )}
+
       {/* Prompt input and button */}
       <View style={styles.promptContainer}>
         <Text style={styles.label}>Question:</Text>
@@ -420,10 +424,20 @@ export default function ContinuousVisionCamera() {
           onChangeText={setUserPrompt}
         />
         <TouchableOpacity
-          style={styles.promptButton}
+          style={[styles.promptButton, { marginBottom: 12 }]}
           onPress={handleUserPromptSubmit}
         >
           <Text style={styles.promptButtonText}>Analyze</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.promptButton}
+          onPress={() => setShowIntervalControls((prev) => !prev)}
+        >
+          <Text style={styles.buttonText}>
+            {showIntervalControls
+              ? "Hide Interval Settings"
+              : "Set Auto-Capture Interval"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
