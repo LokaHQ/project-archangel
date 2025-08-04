@@ -13,6 +13,7 @@ import { CactusVLM } from "cactus-react-native";
 import { VLMConfig } from "@/config/vlmConfig";
 import { useModelDownload } from "@/hooks/useModelDownload";
 import { useScopedStorage, cleanPath } from "@/utils/storage";
+import { cleanText } from "@/utils/text";
 import {
   checkAndroidVersion,
   requestStoragePermission,
@@ -41,6 +42,16 @@ export default function ContinuousVisionCamera() {
   );
   const [userPrompt, setUserPrompt] = useState("Describe what's ahead of me.");
   const [showIntervalControls, setShowIntervalControls] = useState(false);
+
+  // ADD: History state
+  type AnalysisHistoryItem = {
+    text: string;
+    timestamp: string;
+    prompt: string;
+  };
+  const [analysisHistory, setAnalysisHistory] = useState<AnalysisHistoryItem[]>(
+    []
+  );
 
   useEffect(() => {
     initializeVLM();
@@ -209,16 +220,24 @@ export default function ContinuousVisionCamera() {
         }
       );
 
+      // ADD: Handle final state and history
+      const rawText =
+        analysisResponse.trim() ||
+        result.text?.trim() ||
+        "Analysis completed but no text returned";
+      const finalText = cleanText(rawText);
+      setCurrentAnalysis(finalText);
+      setAnalysisHistory((prev) => [
+        {
+          text: finalText,
+          timestamp: new Date().toLocaleTimeString(),
+          prompt: prompt || "Auto",
+        },
+        ...prev,
+      ]);
+
       console.log("Final analysis result:", result.text);
       console.log("Accumulated response:", analysisResponse);
-
-      if (analysisResponse.trim()) {
-        setCurrentAnalysis(analysisResponse.trim());
-      } else if (result.text?.trim()) {
-        setCurrentAnalysis(result.text.trim());
-      } else {
-        setCurrentAnalysis("Analysis completed but no text returned");
-      }
 
       // Clean up temporary image
       await FileSystem.deleteAsync(destPath, { idempotent: true });
@@ -364,7 +383,7 @@ export default function ContinuousVisionCamera() {
             {currentAnalysis || "Start camera to see real-time analysis"}
           </Text>
 
-          {/* Analysis history could go here */}
+          {/* Current Analysis */}
           {currentAnalysis && (
             <View style={styles.analysisDetails}>
               <Text style={styles.analysisDetailsTitle}>Analysis Details:</Text>
@@ -377,6 +396,32 @@ export default function ContinuousVisionCamera() {
               <Text style={styles.analysisDetailsText}>
                 Status: {isActive ? "Active" : "Stopped"}
               </Text>
+            </View>
+          )}
+          {/* Analysis History */}
+          {analysisHistory.length > 0 && (
+            <View style={styles.chatHistoryContainer}>
+              <Text style={styles.chatHistoryTitle}>Conversation History</Text>
+              {analysisHistory.map((item, index) => (
+                <View key={index} style={styles.chatConversation}>
+                  {/* User question (right side) */}
+                  <View style={styles.userMessageContainer}>
+                    <View style={styles.userBubble}>
+                      <Text style={styles.userMessageText}>{item.prompt}</Text>
+                    </View>
+                    <Text style={styles.messageTimestamp}>
+                      {item.timestamp}
+                    </Text>
+                  </View>
+
+                  {/* AI response (left side) */}
+                  <View style={styles.aiMessageContainer}>
+                    <View style={styles.aiBubble}>
+                      <Text style={styles.aiMessageText}>{item.text}</Text>
+                    </View>
+                  </View>
+                </View>
+              ))}
             </View>
           )}
         </View>
@@ -657,5 +702,89 @@ const styles = StyleSheet.create({
   },
   intervalButtonTextActive: {
     color: "white",
+  },
+  // Chat-like history styles
+  chatHistoryContainer: {
+    marginTop: 20,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    padding: 16,
+  },
+
+  chatHistoryTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 16,
+    textAlign: "center",
+  },
+
+  chatConversation: {
+    marginBottom: 20,
+  },
+
+  // User message (right side)
+  userMessageContainer: {
+    alignItems: "flex-end",
+    marginBottom: 8,
+  },
+
+  userBubble: {
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomRightRadius: 4,
+    maxWidth: "80%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+
+  userMessageText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "500",
+  },
+
+  // AI message (left side)
+  aiMessageContainer: {
+    alignItems: "flex-start",
+    marginBottom: 4,
+  },
+
+  aiBubble: {
+    backgroundColor: "#e9ecef",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    maxWidth: "80%",
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+
+  aiMessageText: {
+    color: "#333",
+    fontSize: 16,
+    lineHeight: 22,
+  },
+
+  messageTimestamp: {
+    fontSize: 12,
+    color: "#888",
+    marginTop: 4,
+    marginRight: 8,
   },
 });
