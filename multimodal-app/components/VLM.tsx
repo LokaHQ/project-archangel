@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, Text, TouchableOpacity, Alert, StyleSheet } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Alert,
+  StyleSheet,
+  TextInput,
+} from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import * as FileSystem from "expo-file-system";
 import { CactusVLM } from "cactus-react-native";
@@ -20,13 +27,19 @@ export default function ContinuousVisionCamera() {
   const [isActive, setIsActive] = useState(false);
   const [currentAnalysis, setCurrentAnalysis] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [captureInterval, setCaptureInterval] = useState(3000); // 3 seconds
+  const [captureInterval, setCaptureInterval] = useState(3000);
   const [facing, setFacing] = useState<CameraType>("back");
 
   const cameraRef = useRef<CameraView>(null);
   const intervalRef = useRef<number | null>(null);
   const analysisQueueRef = useRef<string[]>([]);
   const isProcessingRef = useRef(false);
+
+  // ADD: Modle toggle state
+  const [captureMode, setCaptureMode] = useState<"interval" | "onDemand">(
+    "interval"
+  );
+  const [userPrompt, setUserPrompt] = useState("Describe what's ahead of me.");
 
   useEffect(() => {
     initializeVLM();
@@ -39,14 +52,14 @@ export default function ContinuousVisionCamera() {
   }, []);
 
   useEffect(() => {
-    if (isActive && vlm && permission?.granted) {
+    if (captureMode === "interval" && isActive && vlm && permission?.granted) {
       startContinuousCapture();
     } else {
       stopContinuousCapture();
     }
 
     return () => stopContinuousCapture();
-  }, [isActive, vlm, permission?.granted]);
+  }, [isActive, vlm, permission?.granted, captureMode]);
 
   const initializeVLM = async () => {
     try {
@@ -135,7 +148,8 @@ export default function ContinuousVisionCamera() {
     }
   };
 
-  const processAnalysisQueue = async () => {
+  // CHANGE: Process analysis queue can take optional prompt
+  const processAnalysisQueue = async (prompt?: string) => {
     if (isProcessingRef.current || analysisQueueRef.current.length === 0) {
       return;
     }
@@ -175,7 +189,7 @@ export default function ContinuousVisionCamera() {
       const messages = [
         {
           role: "user",
-          content: "Briefly describe what you see in this image",
+          content: prompt || "Briefly describe what you see in this image",
         },
       ];
 
@@ -214,6 +228,25 @@ export default function ContinuousVisionCamera() {
     } finally {
       isProcessingRef.current = false;
       setIsAnalyzing(false);
+    }
+  };
+
+  // ADD: User prompt handling
+  const handleUserPromptSubmit = async () => {
+    if (!cameraRef.current || !vlm || isProcessingRef.current) return;
+
+    try {
+      const photo = await cameraRef.current.takePictureAsync({
+        quality: 0.3,
+        base64: false,
+      });
+
+      if (photo?.uri) {
+        analysisQueueRef.current.push(photo.uri);
+        processAnalysisQueue(userPrompt);
+      }
+    } catch (error) {
+      console.error("Failed to take photo:", error);
     }
   };
 
@@ -376,11 +409,65 @@ export default function ContinuousVisionCamera() {
           ))}
         </View>
       </View>
+      {/* Prompt input and button */}
+      <View style={styles.promptContainer}>
+        <Text style={styles.label}>Question:</Text>
+        <TextInput
+          style={styles.promptInput}
+          placeholder="What do you want to ask the camera?"
+          placeholderTextColor="#aaa"
+          value={userPrompt}
+          onChangeText={setUserPrompt}
+        />
+        <TouchableOpacity
+          style={styles.promptButton}
+          onPress={handleUserPromptSubmit}
+        >
+          <Text style={styles.promptButtonText}>Analyze</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  promptContainer: {
+    padding: 16,
+    backgroundColor: "#fff",
+    borderTopWidth: 1,
+    borderColor: "#eee",
+  },
+
+  label: {
+    fontSize: 16,
+    fontWeight: "500",
+    marginBottom: 8,
+    color: "#333",
+  },
+
+  promptInput: {
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 12,
+    padding: 12,
+    fontSize: 16,
+    color: "#000",
+    marginBottom: 10,
+  },
+
+  promptButton: {
+    backgroundColor: "#8e44ad",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  promptButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
+
   container: {
     flex: 1,
   },
