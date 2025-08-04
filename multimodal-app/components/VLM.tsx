@@ -1,3 +1,14 @@
+/**
+ * VLM.tsx
+ *
+ * A React Native component that provides real-time computer vision analysis
+ * using camera feed. Features include continuous image capture, VLM-powered
+ * analysis, chat-like conversation history, and customizable capture intervals.
+ *
+ * Supports both automatic interval-based capture and on-demand analysis
+ * with user-defined prompts. Includes storage management for both modern
+ * and legacy Android versions.
+ */
 import React, { useState, useEffect, useRef } from "react";
 import {
   View,
@@ -20,7 +31,29 @@ import {
 } from "@/utils/permissions";
 import ParallaxScrollView from "@/components/predefined/ParallaxScrollView";
 
-export default function ContinuousVisionCamera() {
+/**
+ * Represents a single analysis result in the conversation history
+ */
+type AnalysisHistoryItem = {
+  /** The VLM's analysis response text */
+  text: string;
+  /** Timestamp when the analysis was completed */
+  timestamp: string;
+  /** The user prompt or "Auto" for interval captures */
+  prompt: string;
+};
+
+/**
+ * VisionChat
+ *
+ * Main camera component that:
+ * - Initializes and manages VLM (Vision Language Model)
+ * - Handles continuous or on-demand image capture
+ * - Provides real-time analysis with chat-like interface
+ * - Manages storage permissions and model downloads
+ * - Supports customizable capture intervals and prompts
+ */
+export default function VisionChat() {
   const { downloadModel } = useModelDownload();
   const [permission, requestPermission] = useCameraPermissions();
   const [vlm, setVLM] = useState<CactusVLM | null>(null);
@@ -31,6 +64,7 @@ export default function ContinuousVisionCamera() {
   const [captureInterval, setCaptureInterval] = useState(3000);
   const [facing, setFacing] = useState<CameraType>("back");
 
+  // Refs for camera and processing management
   const cameraRef = useRef<CameraView>(null);
   const intervalRef = useRef<number | null>(null);
   const analysisQueueRef = useRef<string[]>([]);
@@ -44,15 +78,13 @@ export default function ContinuousVisionCamera() {
   const [showIntervalControls, setShowIntervalControls] = useState(false);
 
   // ADD: History state
-  type AnalysisHistoryItem = {
-    text: string;
-    timestamp: string;
-    prompt: string;
-  };
   const [analysisHistory, setAnalysisHistory] = useState<AnalysisHistoryItem[]>(
     []
   );
 
+  /**
+   * Effect: Initialize VLM on component mount and cleanup on unmount
+   */
   useEffect(() => {
     initializeVLM();
     return () => {
@@ -63,6 +95,9 @@ export default function ContinuousVisionCamera() {
     };
   }, []);
 
+  /**
+   * Effect: Manage continuous capture based on active state and permissions
+   */
   useEffect(() => {
     if (captureMode === "interval" && isActive && vlm && permission?.granted) {
       startContinuousCapture();
@@ -73,6 +108,10 @@ export default function ContinuousVisionCamera() {
     return () => stopContinuousCapture();
   }, [isActive, vlm, permission?.granted, captureMode]);
 
+  /**
+   * Initializes the Vision Language Model with proper storage setup
+   * Handles both modern Android scoped storage and legacy permission-based storage
+   */
   const initializeVLM = async () => {
     try {
       if (await checkAndroidVersion()) {
@@ -118,6 +157,10 @@ export default function ContinuousVisionCamera() {
   };
 
   //ADD: Camera Capture
+  /**
+   * Starts continuous image capture at specified intervals
+   * Captures first frame immediately, then continues at set interval
+   */
   const startContinuousCapture = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -131,6 +174,9 @@ export default function ContinuousVisionCamera() {
     captureAndAnalyze();
   };
 
+  /**
+   * Stops continuous capture by clearing the interval timer
+   */
   const stopContinuousCapture = () => {
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -139,6 +185,10 @@ export default function ContinuousVisionCamera() {
   };
 
   //ADD: Analyze frame captured by camera
+  /**
+   * Captures a photo from the camera and adds it to the analysis queue
+   * Uses reduced quality (0.3) for faster processing
+   */
   const captureAndAnalyze = async () => {
     if (!cameraRef.current || !vlm || isProcessingRef.current) {
       return;
@@ -161,6 +211,12 @@ export default function ContinuousVisionCamera() {
   };
 
   // CHANGE: Process analysis queue can take optional prompt
+  /**
+   * Processes the analysis queue using VLM for image understanding
+   * Only processes the latest image to avoid lag from multiple queued images
+   *
+   * @param prompt - Optional custom prompt for analysis, defaults to generic description
+   */
   const processAnalysisQueue = async (prompt?: string) => {
     if (isProcessingRef.current || analysisQueueRef.current.length === 0) {
       return;
@@ -252,6 +308,10 @@ export default function ContinuousVisionCamera() {
   };
 
   // ADD: User prompt handling
+  /**
+   * Handles user-initiated analysis with custom prompt
+   * Captures a photo and processes it with the user's question
+   */
   const handleUserPromptSubmit = async () => {
     if (!cameraRef.current || !vlm || isProcessingRef.current) return;
 
@@ -270,6 +330,10 @@ export default function ContinuousVisionCamera() {
     }
   };
 
+  /**
+   * Resets the VLM context by reinitializing the model
+   * Used for error recovery when VLM encounters issues
+   */
   const resetVLMContext = async () => {
     if (!vlm) return;
     try {
@@ -281,10 +345,14 @@ export default function ContinuousVisionCamera() {
     }
   };
 
+  /**
+   * Toggles between front and back camera
+   */
   const toggleCamera = () => {
     setFacing((current) => (current === "back" ? "front" : "back"));
   };
 
+  // Loading state while VLM initializes
   if (isVLMLoading) {
     return (
       <View style={styles.centerContainer}>
@@ -293,6 +361,7 @@ export default function ContinuousVisionCamera() {
     );
   }
 
+  // Permission request state
   if (!permission) {
     return (
       <View style={styles.centerContainer}>
@@ -301,6 +370,7 @@ export default function ContinuousVisionCamera() {
     );
   }
 
+  // Permission denied state
   if (!permission.granted) {
     return (
       <View style={styles.centerContainer}>
@@ -398,6 +468,7 @@ export default function ContinuousVisionCamera() {
               </Text>
             </View>
           )}
+
           {/* Analysis History */}
           {analysisHistory.length > 0 && (
             <View style={styles.chatHistoryContainer}>
@@ -414,7 +485,7 @@ export default function ContinuousVisionCamera() {
                     </Text>
                   </View>
 
-                  {/* AI response (left side) */}
+                  {/* VLM response (left side) */}
                   <View style={styles.aiMessageContainer}>
                     <View style={styles.aiBubble}>
                       <Text style={styles.aiMessageText}>{item.text}</Text>

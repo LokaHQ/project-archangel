@@ -14,7 +14,7 @@ export function cleanText(text: string): string {
     .replace(/<\/s>/g, "")
     .replace(/<eos>/g, "")
     .replace(/<\/?[^>]+(>|$)/g, "")
-    .replace(/\s+/g, " ") 
+    .replace(/\s+/g, " ")
     .trim();
 }
 
