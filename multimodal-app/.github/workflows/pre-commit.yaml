@@ -1,0 +1,43 @@
+name: Pre-commit Checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pre-commit:
+    name: Pre-commit validation
+    runs-on: ubuntu-latest
+
+    timeout-minutes: 10
+
+    steps:
+      # Get the code from your repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Setup Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      # Install project dependencies
+      - name: Install dependencies
+        run: npm ci
+
+      # Check TypeScript types
+      - name: TypeScript type check
+        run: npx tsc --noEmit --skipLibCheck
+        continue-on-error: false
+
+      # Run ESLint for code quality
+      - name: Run ESLint
+        run: npx eslint . --ext .js,.jsx,.ts,.tsx --max-warnings 0
+
+      # Check code formatting with Prettier
+      - name: Check code formatting
+        run: npx prettier --check "**/*.{js,jsx,ts,tsx,json}"

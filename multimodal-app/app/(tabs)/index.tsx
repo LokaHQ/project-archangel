@@ -7,6 +7,7 @@ import { ThemedView } from "@/components/predefined/ThemedView";
 
 // TTS Import
 import TTSComponent from "@/components/TTS";
+import SpeechToText from "@/components/STT";
 
 export default function HomeScreen() {
   const welcomeMessage =
@@ -26,6 +27,7 @@ export default function HomeScreen() {
         <ThemedText type="title">Welcome!</ThemedText>
       </ThemedView>
       <TTSComponent message={welcomeMessage} />
+      <SpeechToText></SpeechToText>
     </ParallaxScrollView>
   );
 }
